@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7d9d5" />
+    <meta name="description" content="Uma aventura de plataforma em pixel art com Haru, Barão e muito matcha." />
+    <title>Matcha Cat Quest</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="game.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <div class="page-heading" aria-hidden="true">
+        <span>FEITO COM &lt;3 POR KAYKY</span>
+      </div>
+
+      <section class="game-shell" aria-label="Jogo Matcha Cat Quest">
+        <header class="topbar">
+          <div class="brand"><span class="brand-icon">✿</span> MATCHA CAT <span>QUEST</span></div>
+          <div class="topbar-actions">
+            <button id="sound-button" class="icon-button" type="button" aria-label="Desativar som" title="Ativar ou desativar som">♫</button>
+            <button id="pause-button" class="icon-button" type="button" aria-label="Pausar jogo" title="Pausar jogo" disabled>Ⅱ</button>
+          </div>
+        </header>
+
+        <div class="hud" aria-live="polite">
+          <div class="hud-item"><span class="hud-label">FASE</span><strong id="level-display">— / 3</strong></div>
+          <div class="hud-item"><span class="hud-label">MATCHAS</span><strong id="matcha-display">00</strong></div>
+          <div class="hud-item"><span class="hud-label">VIDAS</span><strong id="lives-display" aria-label="Três vidas">♥ ♥ ♥</strong></div>
+          <div class="hud-item hud-stage"><span class="hud-label">CENÁRIO</span><strong id="stage-display">ESCOLHA SEU GATO</strong></div>
+        </div>
+
+        <div class="screen-wrap">
+          <canvas id="game-canvas" width="320" height="192" aria-label="Área do jogo de plataforma"></canvas>
+
+          <div id="menu-screen" class="overlay menu-screen">
+            <div class="menu-content">
+              <p class="eyebrow">UMA AVENTURA EM 3 FASES</p>
+              <h1>MATCHA<br /><span>CAT QUEST</span></h1>
+              <p class="menu-subtitle">Pulinhos, patinhas e copinhos de matcha.</p>
+              <p class="choose-label">ESCOLHA SEU COMPANHEIRO</p>
+              <div class="character-grid" role="group" aria-label="Escolha um gato">
+                <button class="character-card selected" type="button" data-character="haru" aria-pressed="true">
+                  <canvas class="character-preview" data-preview="haru" width="48" height="48" aria-hidden="true"></canvas>
+                  <strong>HARU</strong>
+                  <span>Frajolinha · coleira rosa</span>
+                </button>
+                <button class="character-card" type="button" data-character="barao" aria-pressed="false">
+                  <canvas class="character-preview" data-preview="barao" width="48" height="48" aria-hidden="true"></canvas>
+                  <strong>BARÃO</strong>
+                  <span>Laranjinha · coleira vermelha</span>
+                </button>
+              </div>
+              <button id="start-button" class="primary-button" type="button">COMEÇAR AVENTURA <span aria-hidden="true">➜</span></button>
+              <p class="menu-tip">Colete matchas e encontre a bandeira no fim de cada fase!</p>
+            </div>
+          </div>
+
+          <div id="modal-screen" class="overlay modal-screen hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="modal-card">
+              <p id="modal-eyebrow" class="eyebrow"></p>
+              <h2 id="modal-title"></h2>
+              <p id="modal-message"></p>
+              <div id="modal-stats" class="modal-stats"></div>
+              <div class="modal-actions">
+                <button id="modal-primary" class="primary-button" type="button"></button>
+                <button id="modal-secondary" class="secondary-button" type="button"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-bar">
+          <p><span class="key">←</span><span class="key">→</span> ou <span class="key">A</span><span class="key">D</span> mover <span class="control-separator">·</span> <span class="key space-key">ESPAÇO</span> pular <span class="control-separator">·</span> <span class="key">P</span> pausar</p>
+          <span class="control-note">BOA SORTE, GATINHO! ✦</span>
+        </div>
+      </section>
+
+      <div class="touch-controls" aria-label="Controles por toque">
+        <div class="direction-controls">
+          <button type="button" class="touch-button" data-control="left" aria-label="Mover para a esquerda">◀</button>
+          <button type="button" class="touch-button" data-control="right" aria-label="Mover para a direita">▶</button>
+        </div>
+        <button type="button" class="touch-button jump-button" data-control="jump" aria-label="Pular">PULAR ▲</button>
+      </div>
+    </main>
+  </body>
+</html>
