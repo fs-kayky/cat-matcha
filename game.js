@@ -10,6 +10,7 @@
   const GROUND_Y = 166;
   const PLAYER_WIDTH = 14;
   const PLAYER_HEIGHT = 16;
+  const BLOCK_SIZE = 16;
   const STORAGE_KEY = 'matcha-cat-quest-best';
 
   const elements = {
@@ -37,6 +38,7 @@
       width: 1160,
       ground: [[0, 260], [290, 540], [570, 830], [860, 1160]],
       platforms: [[115, 132, 58], [185, 112, 45], [340, 133, 56], [440, 112, 60], [635, 128, 72], [752, 110, 55], [930, 128, 65]],
+      bonusBlocks: [[48, 121], [585, 120], [1018, 121]],
       matchas: [[85, 153], [143, 120], [207, 100], [370, 121], [470, 100], [668, 116], [779, 98], [963, 116], [1066, 153]],
       spikes: [[405, 158, 13], [723, 158, 14]],
       enemies: [[321, 306, 384, 0.48], [898, 885, 976, 0.55]],
@@ -48,6 +50,7 @@
       width: 1280,
       ground: [[0, 215], [255, 475], [518, 750], [790, 1005], [1046, 1280]],
       platforms: [[112, 129, 61], [300, 128, 68], [416, 112, 48], [559, 131, 69], [677, 113, 62], [835, 128, 73], [950, 112, 53], [1100, 127, 65]],
+      bonusBlocks: [[43, 121], [535, 120], [1063, 121]],
       matchas: [[78, 153], [140, 117], [328, 116], [439, 100], [586, 119], [705, 101], [863, 116], [976, 100], [1127, 115], [1210, 153]],
       spikes: [[377, 158, 14], [631, 158, 16], [917, 158, 15]],
       enemies: [[285, 270, 354, 0.58], [812, 801, 894, 0.66], [1090, 1070, 1170, 0.54]],
@@ -59,6 +62,7 @@
       width: 1400,
       ground: [[0, 215], [263, 490], [537, 760], [808, 1030], [1080, 1400]],
       platforms: [[121, 128, 65], [310, 126, 65], [424, 112, 48], [590, 129, 69], [704, 112, 54], [856, 127, 68], [965, 112, 53], [1133, 126, 66], [1250, 112, 57]],
+      bonusBlocks: [[53, 121], [570, 120], [1108, 121]],
       matchas: [[92, 153], [151, 116], [338, 114], [448, 100], [620, 117], [729, 100], [881, 115], [991, 100], [1160, 114], [1278, 100], [1340, 153]],
       spikes: [[384, 158, 15], [655, 158, 15], [939, 158, 16], [1213, 158, 14]],
       enemies: [[288, 275, 362, 0.65], [558, 549, 635, 0.58], [823, 816, 913, 0.72], [1096, 1087, 1183, 0.68]],
@@ -77,6 +81,7 @@
     bankedScore: 0,
     levelScore: 0,
     collected: [],
+    blocks: [],
     enemies: [],
     checkpoint: 20,
     particles: [],
@@ -146,7 +151,8 @@
     game.lives = 3;
     game.checkpoint = 20;
     game.collected = game.level.matchas.map(() => false);
-    game.enemies = game.level.enemies.map(([x, min, max, speed]) => ({ x, min, max, speed, direction: 1 }));
+    game.blocks = game.level.bonusBlocks.map(([x, y]) => ({ x, y, used: false, bump: 0 }));
+    game.enemies = game.level.enemies.map(([x, min, max, speed]) => ({ x, min, max, speed, direction: 1, defeated: false }));
     game.player = { x: 20, y: GROUND_Y - PLAYER_HEIGHT, vx: 0, vy: 0, facing: 1, grounded: true, invincible: 0 };
     game.camera = 0;
     game.particles = [];
@@ -305,6 +311,13 @@
     }
   }
 
+  function awardMatcha(x, y) {
+    game.levelScore += 1;
+    spawnParticles(x, y, '#e5f79d', 9);
+    playSound(680 + game.levelScore * 25, 0.1);
+    updateHud();
+  }
+
   function overlaps(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
@@ -347,14 +360,38 @@
     }
 
     player.x = Math.max(0, Math.min(level.width - PLAYER_WIDTH, player.x + player.vx));
+    const previousTop = player.y;
     const previousBottom = player.y + PLAYER_HEIGHT;
     player.vy = Math.min(player.vy + 0.27, 6.4);
     player.y += player.vy;
+    const fallingBeforeLanding = player.vy > 0.5;
     player.grounded = false;
+
+    if (player.vy < 0) {
+      for (const block of game.blocks) {
+        const hitFromBelow = previousTop >= block.y + BLOCK_SIZE - 2 &&
+          player.y <= block.y + BLOCK_SIZE &&
+          player.x + PLAYER_WIDTH > block.x + 2 && player.x < block.x + BLOCK_SIZE - 2;
+        if (!hitFromBelow) continue;
+
+        player.y = block.y + BLOCK_SIZE;
+        player.vy = 0.7;
+        game.jumpCut = true;
+        block.bump = 8;
+        if (!block.used) {
+          block.used = true;
+          awardMatcha(block.x + BLOCK_SIZE / 2, block.y - 2);
+        } else {
+          playSound(210, 0.06);
+        }
+        break;
+      }
+    }
 
     const surfaces = [
       ...level.ground.map(([start, end]) => ({ x: start, w: end - start, y: GROUND_Y })),
       ...level.platforms.map(([x, y, w]) => ({ x, y, w })),
+      ...game.blocks.map((block) => ({ x: block.x, y: block.y, w: BLOCK_SIZE })),
     ];
     for (const surface of surfaces) {
       const landed = player.vy >= 0 && previousBottom <= surface.y + 2 &&
@@ -379,19 +416,29 @@
       const [x, y] = level.matchas[index];
       if (overlaps({ x: player.x, y: player.y, w: PLAYER_WIDTH, h: PLAYER_HEIGHT }, { x: x - 7, y: y - 8, w: 15, h: 13 })) {
         game.collected[index] = true;
-        game.levelScore += 1;
-        spawnParticles(x, y, '#dcf3a3', 7);
-        playSound(680 + game.levelScore * 25, 0.1);
-        updateHud();
+        awardMatcha(x, y);
       }
     }
 
+    for (const block of game.blocks) block.bump = Math.max(0, block.bump - 1);
+
     for (const enemy of game.enemies) {
+      if (enemy.defeated) continue;
       enemy.x += enemy.speed * enemy.direction;
       if (enemy.x < enemy.min || enemy.x > enemy.max) enemy.direction *= -1;
       if (overlaps({ x: player.x + 2, y: player.y + 2, w: 10, h: 12 }, { x: enemy.x, y: GROUND_Y - 10, w: 12, h: 10 })) {
-        damagePlayer();
-        if (game.mode !== 'playing') return;
+        if (fallingBeforeLanding && previousBottom <= GROUND_Y - 6) {
+          enemy.defeated = true;
+          player.y = GROUND_Y - 10 - PLAYER_HEIGHT;
+          player.vy = -3.8;
+          player.grounded = false;
+          game.coyoteFrames = 0;
+          spawnParticles(enemy.x + 6, GROUND_Y - 6, '#ffe3a8', 10);
+          playSound(470, 0.1);
+        } else {
+          damagePlayer();
+          if (game.mode !== 'playing') return;
+        }
       }
     }
 
@@ -428,51 +475,75 @@
     context.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
   }
 
-  function drawCloud(x, y, color) {
-    fill(x + 5, y, 22, 5, color);
-    fill(x, y + 5, 35, 7, color);
-    fill(x + 7, y + 12, 23, 3, color);
+  function drawCloud(x, y, color, shadow) {
+    fill(x + 7, y + 1, 15, 4, shadow);
+    fill(x + 3, y + 5, 28, 9, shadow);
+    fill(x + 8, y + 13, 21, 3, shadow);
+    fill(x + 7, y, 15, 4, color);
+    fill(x + 3, y + 4, 28, 8, color);
+    fill(x, y + 7, 36, 5, color);
+    fill(x + 6, y + 12, 23, 2, color);
+    fill(x + 8, y + 2, 7, 1, '#ffffff');
   }
 
   function drawBackground(theme, camera) {
     const palettes = {
-      garden: { sky: '#bedfda', high: '#d8eee1', low: '#f7e5ce', hill: '#9cc7ad', back: '#73ac92', cloud: '#fff8e9' },
-      sunset: { sky: '#e7a6ae', high: '#f6c6ae', low: '#ffe5bc', hill: '#b98cad', back: '#8d729a', cloud: '#ffe9d4' },
-      night: { sky: '#555278', high: '#777098', low: '#aa8da8', hill: '#514a79', back: '#393c65', cloud: '#b0a4c0' },
+      garden: { sky: '#70cbe2', high: '#a1e4dc', low: '#e6efbd', hill: '#8acb91', hillLight: '#afe0a1', back: '#56aa82', cloud: '#fffdf0', cloudShade: '#c4e4d9' },
+      sunset: { sky: '#dd7896', high: '#f4a381', low: '#ffd5a0', hill: '#c18caa', hillLight: '#dfa5ae', back: '#896e9e', cloud: '#ffeed8', cloudShade: '#eab9b9' },
+      night: { sky: '#303c74', high: '#5d5e9b', low: '#9280b4', hill: '#565b9a', hillLight: '#797ab2', back: '#343e77', cloud: '#c8bbdb', cloudShade: '#867da9' },
     };
     const colors = palettes[theme];
-    fill(0, 0, WIDTH, 78, colors.sky);
-    fill(0, 78, WIDTH, 54, colors.high);
-    fill(0, 132, WIDTH, 60, colors.low);
+    fill(0, 0, WIDTH, 72, colors.sky);
+    fill(0, 72, WIDTH, 57, colors.high);
+    fill(0, 129, WIDTH, 63, colors.low);
+    fill(0, 71, WIDTH, 2, theme === 'night' ? '#4b538b' : '#bce7dc');
 
     const orbX = Math.round(251 - camera * 0.035);
     if (theme === 'night') {
-      fill(orbX, 20, 27, 27, '#f8eccd');
-      fill(orbX + 19, 18, 10, 20, colors.sky);
-      for (let index = 0; index < 22; index += 1) {
+      fill(orbX - 2, 18, 31, 31, '#8d82aa');
+      fill(orbX, 20, 27, 27, '#f9edc5');
+      fill(orbX + 20, 17, 10, 22, colors.sky);
+      fill(orbX + 4, 25, 3, 3, '#e8dcb6');
+      for (let index = 0; index < 26; index += 1) {
         const x = (index * 83 + 18 - camera * 0.08) % 380;
         const y = 10 + (index * 37) % 70;
-        fill(x < 0 ? x + 380 : x, y, index % 4 === 0 ? 2 : 1, 2, '#fbe5cf');
+        const starX = x < 0 ? x + 380 : x;
+        fill(starX, y, index % 4 === 0 ? 3 : 1, 1, '#fff0c8');
+        if (index % 4 === 0) fill(starX + 1, y - 1, 1, 3, '#fff0c8');
       }
     } else {
-      fill(orbX, 25, 26, 26, theme === 'garden' ? '#fff3bc' : '#ffe3a4');
-      fill(orbX + 3, 22, 20, 3, theme === 'garden' ? '#fff3bc' : '#ffe3a4');
+      const sun = theme === 'garden' ? '#fff3a9' : '#ffe29a';
+      fill(orbX - 5, 30, 36, 16, '#ffffff44');
+      fill(orbX, 24, 26, 26, sun);
+      fill(orbX + 3, 21, 20, 3, sun);
+      fill(orbX + 3, 50, 20, 3, sun);
+      fill(orbX - 3, 32, 3, 9, sun);
+      fill(orbX + 26, 32, 3, 9, sun);
     }
 
     for (let index = 0; index < 7; index += 1) {
       const x = index * 78 - ((camera * 0.18) % 78) - 25;
-      drawCloud(x, 23 + (index % 3) * 15, colors.cloud);
+      drawCloud(x, 23 + (index % 3) * 15, colors.cloud, colors.cloudShade);
     }
 
     for (let index = 0; index < 9; index += 1) {
       const x = index * 58 - ((camera * 0.32) % 58) - 25;
-      fill(x + 10, 103 - (index % 3) * 6, 36, 47, colors.hill);
-      fill(x, 114 - (index % 3) * 6, 58, 38, colors.hill);
+      const top = 104 - (index % 3) * 5;
+      fill(x + 18, top, 22, 62, colors.hill);
+      fill(x + 10, top + 8, 38, 54, colors.hill);
+      fill(x + 2, top + 18, 54, 44, colors.hill);
+      fill(x + 18, top + 2, 7, 27, colors.hillLight);
+      fill(x + 10, top + 20, 4, 22, colors.hillLight);
+      fill(x + 29, top + 32, 4, 3, colors.hillLight);
+      fill(x + 39, top + 39, 3, 3, colors.hillLight);
     }
     for (let index = 0; index < 10; index += 1) {
       const x = index * 46 - ((camera * 0.5) % 46) - 15;
-      fill(x + 5, 134 - (index % 3) * 6, 34, 30, colors.back);
-      fill(x, 145 - (index % 3) * 6, 46, 25, colors.back);
+      const top = 133 - (index % 3) * 5;
+      fill(x + 7, top, 32, 33, colors.back);
+      fill(x, top + 10, 46, 24, colors.back);
+      fill(x + 15, top + 4, 3, 3, colors.hillLight);
+      fill(x + 31, top + 14, 3, 3, colors.hillLight);
     }
 
     if (theme === 'garden') {
@@ -503,27 +574,89 @@
   }
 
   function drawGround(start, end, camera, theme) {
-    const x = start - camera;
-    const width = end - start;
-    const dark = theme === 'night' ? '#403d62' : theme === 'sunset' ? '#876579' : '#927b69';
-    const dirt = theme === 'night' ? '#555276' : theme === 'sunset' ? '#aa7d81' : '#b99472';
-    const grass = theme === 'night' ? '#a9a0cb' : theme === 'sunset' ? '#efb18d' : '#92be85';
-    fill(x, GROUND_Y, width, HEIGHT - GROUND_Y, dark);
-    fill(x, GROUND_Y, width, 5, grass);
-    fill(x, GROUND_Y + 5, width, 4, dirt);
-    for (let tile = Math.ceil(start / 16) * 16; tile < end; tile += 16) {
-      fill(tile - camera + 4, GROUND_Y + 11, 4, 2, dirt);
-      fill(tile - camera + 11, GROUND_Y + 19, 3, 2, dirt);
-      fill(tile - camera, GROUND_Y + 5, 1, HEIGHT - GROUND_Y, '#51445c33');
+    const palette = {
+      garden: { edge: '#503e56', cap: '#438d54', grass: '#69c35c', shine: '#b0e67a', soil: '#bd875b', light: '#e0aa70', shadow: '#875b53' },
+      sunset: { edge: '#5e4969', cap: '#c76e77', grass: '#efaa75', shine: '#ffd193', soil: '#ad6871', light: '#d5897a', shadow: '#79536a' },
+      night: { edge: '#34365b', cap: '#62699a', grass: '#91b89a', shine: '#c4d4aa', soil: '#686899', light: '#9290b6', shadow: '#484a78' },
+    }[theme];
+    fill(start - camera, GROUND_Y, end - start, HEIGHT - GROUND_Y, palette.edge);
+
+    for (let tile = start; tile < end; tile += 16) {
+      const left = Math.round(tile - camera);
+      if (left > WIDTH || left + 16 < 0) continue;
+      const width = Math.min(16, end - tile);
+      fill(left + 1, GROUND_Y + 4, width - 1, HEIGHT - GROUND_Y - 4, palette.soil);
+      fill(left, GROUND_Y, width, 2, palette.cap);
+      fill(left, GROUND_Y + 2, width, 3, palette.grass);
+      if (width > 3) fill(left + 2, GROUND_Y + 2, Math.min(8, width - 2), 1, palette.shine);
+      if (width > 8) fill(left + 3, GROUND_Y + 7, 5, 2, palette.light);
+      if (width > 14) fill(left + 10, GROUND_Y + 12, 4, 2, palette.shadow);
+      if (width > 6) fill(left + 2, GROUND_Y + 19, 4, 2, palette.shadow);
+      if (width > 12) fill(left + 8, GROUND_Y + 22, 4, 2, palette.light);
+      fill(left, GROUND_Y + 5, 1, HEIGHT - GROUND_Y - 5, palette.edge);
+      fill(left + 1, GROUND_Y + 15, Math.max(0, width - 1), 1, palette.shadow);
     }
   }
 
   function drawPlatform(x, y, width, camera, theme) {
-    const left = x - camera;
-    fill(left, y, width, 9, '#44384c');
-    fill(left + 1, y + 1, width - 2, 3, theme === 'night' ? '#b5a7d3' : theme === 'sunset' ? '#f0b69f' : '#a7d58f');
-    fill(left + 2, y + 4, width - 4, 3, theme === 'night' ? '#6e648e' : theme === 'sunset' ? '#bb8590' : '#a88d79');
-    for (let tile = 10; tile < width; tile += 17) fill(left + tile, y + 5, 2, 3, '#4a3b52');
+    const palette = {
+      garden: { face: '#c58867', top: '#f4c294', edge: '#755166', shadow: '#a06a5f' },
+      sunset: { face: '#bd707c', top: '#f5ad90', edge: '#684b70', shadow: '#925c76' },
+      night: { face: '#7472a3', top: '#b9a7c4', edge: '#46466d', shadow: '#595782' },
+    }[theme];
+    fill(x - camera, y, width, 10, palette.edge);
+    for (let offset = 0; offset < width; offset += 16) {
+      const left = Math.round(x + offset - camera);
+      const tileWidth = Math.min(16, width - offset);
+      if (tileWidth < 4) continue;
+      fill(left + 1, y + 1, tileWidth - 2, 7, palette.face);
+      fill(left + 2, y + 1, tileWidth - 3, 2, palette.top);
+      if (tileWidth > 9) fill(left + 4, y + 4, 5, 1, palette.shadow);
+      if (tileWidth > 14) fill(left + 10, y + 6, 4, 1, palette.shadow);
+      fill(left + 1, y + 8, tileWidth - 2, 1, palette.shadow);
+    }
+  }
+
+  function drawBonusBlock(block, camera, tick) {
+    const offset = block.bump > 0 ? Math.round(Math.sin(block.bump * Math.PI / 8) * 3) : 0;
+    const x = Math.round(block.x - camera);
+    const y = block.y - offset;
+    const edge = block.used ? '#5e5a70' : '#81515d';
+    const face = block.used ? '#a7a2a3' : '#f8bc56';
+    fill(x, y, BLOCK_SIZE, BLOCK_SIZE, edge);
+    fill(x + 1, y + 1, 14, 13, face);
+    fill(x + 2, y + 2, 11, 2, block.used ? '#c4bdb5' : '#ffe38b');
+    fill(x + 2, y + 13, 12, 1, block.used ? '#817b84' : '#c17c55');
+    fill(x + 2, y + 3, 2, 2, edge);
+    fill(x + 12, y + 11, 2, 2, edge);
+
+    if (block.used) {
+      fill(x + 6, y + 5, 4, 5, '#77727c');
+      return;
+    }
+    fill(x + 5, y + 5, 6, 5, '#467b4a');
+    fill(x + 6, y + 5, 4, 3, '#8ecb67');
+    fill(x + 7, y + 4, 2, 2, '#d8ed91');
+    fill(x + 7, y + 10, 2, 2, '#fff0bd');
+    if (tick % 48 < 24) fill(x + 12, y + 3, 2, 2, '#fff2b0');
+  }
+
+  function drawTeaHouse(x, camera, theme) {
+    const left = Math.round(x - camera);
+    const roof = theme === 'night' ? '#564a82' : theme === 'sunset' ? '#a85e79' : '#4d9f71';
+    fill(left + 5, 126, 38, 40, '#614d64');
+    fill(left + 8, 129, 32, 37, '#f0cfaa');
+    fill(left + 10, 132, 28, 2, '#fff0c6');
+    fill(left + 1, 122, 46, 6, '#493c59');
+    fill(left + 5, 116, 38, 7, roof);
+    fill(left + 10, 112, 28, 5, roof);
+    fill(left + 15, 109, 18, 4, roof);
+    fill(left + 1, 122, 46, 2, '#d1bb91');
+    fill(left + 17, 141, 15, 25, '#6e5167');
+    fill(left + 20, 143, 9, 23, '#986d6a');
+    fill(left + 7, 139, 7, 8, '#83ad8b');
+    fill(left + 35, 139, 7, 8, '#83ad8b');
+    fill(left + 23, 148, 2, 2, '#f8d594');
   }
 
   function drawMatcha(x, y, camera, tick) {
@@ -560,33 +693,41 @@
     }
   }
 
-  function drawEnemy(enemy, camera) {
+  function drawEnemy(enemy, camera, theme) {
     const x = Math.round(enemy.x - camera);
-    const y = GROUND_Y - 10 + Math.round(Math.sin(game.tick * 0.12 + enemy.x) * 0.8);
-    fill(x + 2, y, 8, 2, '#66516a');
-    fill(x, y + 2, 12, 7, '#66516a');
-    fill(x + 1, y + 2, 10, 5, '#cba2be');
-    fill(x + 3, y + 4, 2, 2, '#382e45');
-    fill(x + 8, y + 4, 2, 2, '#382e45');
-    fill(x + 5, y + 7, 2, 1, '#9b6c92');
+    const y = GROUND_Y - 10 + Math.round(Math.sin(game.tick * 0.12 + enemy.x) * 0.6);
+    const body = theme === 'night' ? '#a99bd0' : theme === 'sunset' ? '#f2a2ad' : '#d1a5cd';
+    const light = theme === 'night' ? '#d0c4e6' : '#f5cada';
+    fill(x + 3, y, 6, 2, '#574764');
+    fill(x + 1, y + 2, 10, 3, '#574764');
+    fill(x, y + 5, 12, 4, '#574764');
+    fill(x + 2, y + 2, 8, 2, light);
+    fill(x + 1, y + 4, 10, 4, body);
+    fill(x + 2, y + 8, 3, 2, '#574764');
+    fill(x + 8, y + 8, 3, 2, '#574764');
+    fill(x + 3, y + 5, 2, 2, '#342c43');
+    fill(x + 8, y + 5, 2, 2, '#342c43');
+    fill(x + 5, y + 7, 2, 1, '#a56f9e');
   }
 
   function drawFlag(x, camera, tick) {
     const left = Math.round(x - camera);
-    fill(left, GROUND_Y - 39, 3, 39, '#493b53');
-    fill(left + 3, GROUND_Y - 36, 19, 13, '#f2c8aa');
-    fill(left + 3, GROUND_Y - 36, 18, 10, '#f7dba7');
-    fill(left + 18 + Math.round(Math.sin(tick * 0.08)), GROUND_Y - 34, 5, 7, '#f7dba7');
-    fill(left + 8, GROUND_Y - 33, 2, 2, '#ad7a91');
-    fill(left + 14, GROUND_Y - 33, 2, 2, '#ad7a91');
-    fill(left + 10, GROUND_Y - 29, 4, 1, '#ad7a91');
-    fill(left - 4, GROUND_Y - 3, 10, 3, '#493b53');
+    fill(left - 2, GROUND_Y - 53, 7, 4, '#493b53');
+    fill(left, GROUND_Y - 50, 3, 50, '#493b53');
+    fill(left + 1, GROUND_Y - 49, 1, 45, '#e5d1a7');
+    fill(left + 3, GROUND_Y - 47, 20, 14, '#493b53');
+    fill(left + 4, GROUND_Y - 46, 18, 11, '#67b56b');
+    fill(left + 21 + Math.round(Math.sin(tick * 0.08)), GROUND_Y - 44, 5, 8, '#67b56b');
+    fill(left + 8, GROUND_Y - 43, 10, 4, '#bde48a');
+    fill(left + 10, GROUND_Y - 39, 6, 2, '#f5e6ae');
+    fill(left - 5, GROUND_Y - 4, 13, 4, '#493b53');
   }
 
   function drawCat(x, y, character, facing = 1, frame = 0, target = context) {
     const outline = '#383140';
     const main = character === 'haru' ? '#3d3a47' : '#e68c4c';
     const shade = character === 'haru' ? '#252632' : '#b8653d';
+    const light = character === 'haru' ? '#656274' : '#ffc17f';
     const white = '#fff3de';
     const collar = character === 'haru' ? '#f08ba8' : '#d94d56';
     const left = Math.round(x);
@@ -596,25 +737,30 @@
       target.fillRect(left + (facing === 1 ? px : 15 - px - w), top + py, w, h);
     };
 
-    const legOffset = frame ? 1 : 0;
-    pixel(12, 9, 3, 2, outline);
-    pixel(13, 7, 2, 3, main);
+    const legOffset = frame === 1 ? 1 : frame === 2 ? 2 : 0;
+    pixel(12, frame === 2 ? 7 : 9, 3, 2, outline);
+    pixel(13, frame === 2 ? 5 : 7, 2, 4, main);
     pixel(3, 0, 3, 5, outline);
     pixel(10, 0, 3, 5, outline);
     pixel(4, 1, 1, 2, character === 'haru' ? '#c785a4' : '#e8a281');
     pixel(11, 1, 1, 2, '#e8a281');
     pixel(2, 3, 12, 9, outline);
     pixel(3, 4, 10, 7, main);
+    pixel(4, 4, 8, 1, light);
     pixel(4, 7, 8, 4, white);
     pixel(1, 10, 13, 5, outline);
     pixel(2, 10, 11, 4, main);
     pixel(5, 11, 6, 3, white);
-    pixel(3, 14 - legOffset, 3, 2 + legOffset, white);
-    pixel(10, 14, 3, 2, white);
+    pixel(3, 14 - legOffset, 3, 2, white);
+    pixel(10, frame === 2 ? 12 : 14, 3, 2, white);
     if (character === 'haru') {
       pixel(3, 4, 3, 3, shade);
       pixel(10, 4, 3, 3, shade);
       pixel(7, 4, 3, 3, white);
+      pixel(3, 5, 2, 1, light);
+      pixel(10, 5, 2, 1, light);
+      pixel(3, 11, 2, 2, shade);
+      pixel(11, 11, 2, 2, light);
     } else {
       pixel(5, 4, 2, 1, shade);
       pixel(9, 4, 2, 1, shade);
@@ -622,12 +768,20 @@
       pixel(11, 6, 2, 1, shade);
       pixel(3, 11, 2, 2, shade);
       pixel(11, 11, 2, 2, shade);
+      pixel(4, 5, 2, 1, light);
+      pixel(10, 5, 2, 1, light);
+      pixel(5, 11, 1, 2, light);
+      pixel(10, 11, 1, 2, light);
     }
     pixel(3, 9, 10, 2, collar);
     pixel(7, 10, 2, 2, '#f7d68f');
     pixel(5, 6, 2, 2, outline);
     pixel(10, 6, 2, 2, outline);
+    pixel(5, 6, 1, 1, '#fffdf2');
+    pixel(10, 6, 1, 1, '#fffdf2');
     pixel(8, 8, 2, 1, '#dc8192');
+    pixel(1, 8, 2, 1, '#d6b5ae');
+    pixel(12, 8, 2, 1, '#d6b5ae');
   }
 
   function drawDecorations(level, camera) {
@@ -637,9 +791,20 @@
       const screenX = x - camera;
       if (screenX < -10 || screenX > WIDTH + 10) continue;
       const flower = level.theme === 'night' ? '#d4bbdf' : level.theme === 'sunset' ? '#ffdfb2' : '#f7c8ce';
-      fill(screenX + 2, GROUND_Y - 9, 1, 9, '#648875');
-      fill(screenX, GROUND_Y - 12, 5, 5, flower);
-      fill(screenX + 2, GROUND_Y - 10, 1, 1, '#f9edac');
+      const leaf = level.theme === 'night' ? '#8cbbac' : '#4fa771';
+      fill(screenX + 2, GROUND_Y - 10, 1, 10, leaf);
+      fill(screenX, GROUND_Y - 5, 3, 2, leaf);
+      fill(screenX + 3, GROUND_Y - 7, 3, 2, leaf);
+      fill(screenX, GROUND_Y - 13, 5, 5, flower);
+      fill(screenX + 2, GROUND_Y - 15, 1, 9, flower);
+      fill(screenX + 2, GROUND_Y - 11, 1, 1, '#ffe2a7');
+
+      if (Math.floor(x / 71) % 3 === 0) {
+        fill(screenX + 14, GROUND_Y - 8, 20, 8, '#3b765d');
+        fill(screenX + 17, GROUND_Y - 11, 14, 7, '#62ad70');
+        fill(screenX + 20, GROUND_Y - 12, 8, 4, '#9fd47f');
+        fill(screenX + 23, GROUND_Y - 8, 2, 2, '#d7e995');
+      }
     }
   }
 
@@ -648,9 +813,11 @@
 
     if (game.mode === 'menu') {
       drawBackground('garden', game.tick * 0.23);
+      drawTeaHouse(238, 0, 'garden');
       drawGround(0, WIDTH, 0, 'garden');
       drawPlatform(78, 131, 57, 0, 'garden');
       drawPlatform(206, 121, 50, 0, 'garden');
+      drawBonusBlock({ x: 169, y: 121, used: false, bump: 0 }, 0, game.tick);
       drawMatcha(106, 119, 0, game.tick);
       drawMatcha(233, 109, 0, game.tick);
       drawCat(31, 150, 'haru', 1, game.tick % 20 < 10 ? 0 : 1);
@@ -661,11 +828,15 @@
     const level = game.level;
     const camera = Math.round(game.camera);
     drawBackground(level.theme, camera);
+    drawTeaHouse(level.width - 105, camera, level.theme);
     for (const [start, end] of level.ground) drawGround(start, end, camera, level.theme);
     for (const [x, y, width] of level.platforms) drawPlatform(x, y, width, camera, level.theme);
+    for (const block of game.blocks) drawBonusBlock(block, camera, game.tick);
     drawDecorations(level, camera);
     for (const [x, y, width] of level.spikes) drawSpikes(x, y, width, camera);
-    for (const enemy of game.enemies) drawEnemy(enemy, camera);
+    for (const enemy of game.enemies) {
+      if (!enemy.defeated) drawEnemy(enemy, camera, level.theme);
+    }
     for (let index = 0; index < level.matchas.length; index += 1) {
       if (!game.collected[index]) drawMatcha(...level.matchas[index], camera, game.tick);
     }
@@ -676,7 +847,8 @@
     const player = game.player;
     if (player && (player.invincible === 0 || game.tick % 8 < 4)) {
       const walking = Math.abs(player.vx) > 0.4 && player.grounded && game.tick % 12 < 6;
-      drawCat(player.x - camera, player.y, game.character, player.facing, walking ? 1 : 0);
+      const frame = player.grounded ? (walking ? 1 : 0) : 2;
+      drawCat(player.x - camera, player.y, game.character, player.facing, frame);
     }
   }
 
