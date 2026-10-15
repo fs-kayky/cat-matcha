@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7d9d5" />
-    <meta name="description" content="Uma aventura de plataforma em pixel art com Haru, Barão e muito matcha." />
+    <meta name="description" content="Uma aventura de plataforma 16-bit em cinco fases com Haru, Barão, puzzles e muito matcha." />
     <title>Matcha Cat Quest</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="game.js" defer></script>
@@ -25,20 +25,23 @@
         </header>
 
         <div class="hud" aria-live="polite">
-          <div class="hud-item"><span class="hud-label">FASE</span><strong id="level-display">— / 3</strong></div>
+          <div class="hud-item"><span class="hud-label">FASE</span><strong id="level-display">— / 5</strong></div>
           <div class="hud-item"><span class="hud-label">MATCHAS</span><strong id="matcha-display">00</strong></div>
           <div class="hud-item"><span class="hud-label">VIDAS</span><strong id="lives-display" aria-label="Três vidas">♥ ♥ ♥</strong></div>
+          <div class="hud-item"><span class="hud-label">DESAFIO</span><strong id="puzzle-display">—</strong></div>
           <div class="hud-item hud-stage"><span class="hud-label">CENÁRIO</span><strong id="stage-display">ESCOLHA SEU GATO</strong></div>
         </div>
 
         <div class="screen-wrap">
           <canvas id="game-canvas" width="320" height="192" aria-label="Área do jogo de plataforma"></canvas>
+          <div id="puzzle-hint" class="puzzle-hint hidden" role="status" aria-live="polite"></div>
+          <button id="puzzle-prompt" class="puzzle-prompt hidden" type="button">ABRIR DESAFIO <span aria-hidden="true">[E]</span></button>
 
           <div id="menu-screen" class="overlay menu-screen">
             <div class="menu-content">
-              <p class="eyebrow">UMA AVENTURA EM 3 FASES</p>
+              <p class="eyebrow">UMA AVENTURA 16-BIT EM 5 FASES</p>
               <h1>MATCHA<br /><span>CAT QUEST</span></h1>
-              <p class="menu-subtitle">Pulinhos, patinhas e copinhos de matcha.</p>
+              <p class="menu-subtitle">Pulinhos, puzzles e pegadinhas pelo caminho.</p>
               <p class="choose-label">ESCOLHA SEU COMPANHEIRO</p>
               <div class="character-grid" role="group" aria-label="Escolha um gato">
                 <button class="character-card selected" type="button" data-character="haru" aria-pressed="true">
@@ -53,7 +56,18 @@
                 </button>
               </div>
               <button id="start-button" class="primary-button" type="button">COMEÇAR AVENTURA <span aria-hidden="true">➜</span></button>
-              <p class="menu-tip">Colete matchas, pule nos inimigos e bata nos blocos dourados!</p>
+              <p class="menu-tip">Haru enfrenta o veterinário; Barão enfrenta o desodorante Dove. Resolva o desafio junto ao portão para seguir!</p>
+            </div>
+          </div>
+
+          <div id="challenge-screen" class="overlay challenge-screen hidden" role="dialog" aria-modal="true" aria-labelledby="challenge-title">
+            <div class="challenge-card">
+              <p id="challenge-eyebrow" class="eyebrow"></p>
+              <h2 id="challenge-title"></h2>
+              <p id="challenge-instruction"></p>
+              <div id="challenge-content"></div>
+              <p id="challenge-feedback" class="challenge-feedback" role="status" aria-live="polite"></p>
+              <button id="challenge-close" class="secondary-button" type="button">VOLTAR À FASE</button>
             </div>
           </div>
 
